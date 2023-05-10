@@ -10,10 +10,10 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
 #define MAX_LENGTH 80
-#define MAX_BUFFSIZE 2000
-#define HASH_ROUND 5
+#define MAX_BUFFSIZE 100
+#define HASH_ROUND 10
 #define HASH_FIRSTKEY 0x973E
-#define TABLE_SIZE 1000000
+#define TABLE_SIZE 100000000
 
 char exist[TABLE_SIZE] = {0, };
 unsigned int hash(char* line, int len)
@@ -52,35 +52,16 @@ unsigned char * jmp_to_http(unsigned char *p, int maxlen)
 	if(now - p >= maxlen) return NULL;
 	return now;
 }
-/*
-int checklist(unsigned char *p, int max)
-{
-	unsigned char *now = p;
-	int i;
-	int cnt = 0;
-	int len = strlen(banstr) - 1;
-	for(i=0; i<=max; i++)
-	{
-		if(*(p+i) == banstr[cnt])
-		{
-			if(cnt >= len) return 1;
-			cnt++;
-		}
-		else cnt = 0;
-		if(*(p+i) == 0x0d && *(p+i+1) == 0x0a) break;
-	}
-	return 0;
-}*/
 
 void dump(unsigned char* buf, int size) {
 	int i;
-	printf("\n");
+	//printf("\n");
 	for (i = 0; i < size; i++) {
 		if (i != 0 && i % 16 == 0)
 			printf("\n");
 		printf("%02X ", buf[i]);
 	}
-	printf("\n");
+	//printf("\n");
 }
 
 /* returns packet id */
@@ -142,11 +123,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 	if (ret >= 0)
 	{	
 		unsigned char * point = jmp_to_http(data, ret);
-		if(point == NULL)
-		{
-			printf(".");
-		}
-		else
+		if(point != NULL)
 		{
 			
 			while(point - data + 8 < ret)
@@ -154,12 +131,22 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 				point = point + 1;
 				if(*(point-1) == 0x0d && *point == 0x0a && *(point+1) == 'H' && *(point+2) == 'o' && *(point+3) == 's' && *(point+4) == 't')
 				{
-					printf("!\n");
 					char buf[MAX_BUFFSIZE] = {0, };
+					int i = 0;
 					point += 7;
-					strcpy(buf, point);
+					while(point-data < ret)
+					{
+						if(*point == 0x0d && *(point+1) == 0x0a) break;
+						buf[i] = *point;
+						i++;
+						point += 1;
+					}
 					unsigned int num = hash(buf, strlen(buf));
-					if(exist[num] != 0) warning = 1;
+					if(exist[num] != 0)
+					{
+						printf("%s\n", buf);
+						warning = 1;
+					}
 					break;
 				}
 			}
@@ -167,7 +154,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 		//dump(data, ret);
 		//printf("npayload_len=%d\n", ret);
 	}
-	fputc('\n', stdout);
+	//fputc('\n', stdout);
 
 	return id;
 }
