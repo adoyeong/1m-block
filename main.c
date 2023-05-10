@@ -12,14 +12,14 @@
 #define MAX_LENGTH 80
 #define MAX_BUFFSIZE 100
 #define HASH_ROUND 10
-#define HASH_FIRSTKEY 0x973E
+#define HASH_FIRSTKEY 0xFC9
 #define TABLE_SIZE 100000000
 
 char exist[TABLE_SIZE] = {0, };
-unsigned int hash(char* line, int len)
+unsigned long long int hash(char* line, int len)
 {
-	unsigned int num = 0;
-	unsigned int key = HASH_FIRSTKEY;
+	unsigned long long int num = 0;
+	unsigned long long int key = HASH_FIRSTKEY;
 	int i;
 	int round = HASH_ROUND;
 	int jump = len / HASH_ROUND;
@@ -30,9 +30,9 @@ unsigned int hash(char* line, int len)
 	}
 	for (i = 0; i < round; i++)
 	{
-		//printf("-%X\n", key);
-		num = (key << 8) | key;
-		num = (num + line[i * jump]) % TABLE_SIZE;
+		num = (key << 12) | key;
+		num = num + line[i * jump] * 0x9003;
+		num = num % TABLE_SIZE;
 		key = num;
 	}
 	return num;
@@ -141,10 +141,11 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 						i++;
 						point += 1;
 					}
-					unsigned int num = hash(buf, strlen(buf));
+					printf("%s\n", buf);
+					unsigned long long int num = hash(buf, strlen(buf));
 					if(exist[num] != 0)
 					{
-						printf("%s\n", buf);
+						printf("%s - ", buf);
 						warning = 1;
 					}
 					break;
@@ -191,6 +192,8 @@ int main(int argc, char **argv)
 	}
 
 
+	// #########pre-work############
+	
 	unsigned int num = 0;
 	int len = 0;
 	char* FileName = argv[1];
@@ -201,17 +204,16 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	char line[MAX_LENGTH];
+	unsigned int cnt = 0;
 	while (fgets(line, MAX_LENGTH, file) != NULL)
 	{
+		cnt++;
 		len = strlen(line);
-		if (line[len - 1] == '\n') len--;
-		//printf("len : %d\n", len);
+		if (line[len - 1] == '\n') len-= 2;
 		num = hash(line, len);
 		exist[num] += 1;
-		//printf("[%d]\n", num);
 	}
-	printf("Complete Pre-work!\n");
-
+	printf("Complete Pre-work![%d]\n", cnt);
 
 
 	printf("opening library handle\n");
