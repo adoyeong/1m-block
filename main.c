@@ -8,15 +8,36 @@
 #include <errno.h>
 
 #include <libnetfilter_queue/libnetfilter_queue.h>
-/*
-struct ip_hdr
+
+#define MAX_LENGTH 80
+#define MAX_BUFFSIZE 2000
+#define HASH_ROUND 5
+#define HASH_FIRSTKEY 0x973E
+#define TABLE_SIZE 1000000
+
+char exist[TABLE_SIZE] = {0, };
+unsigned int hash(char* line, int len)
 {
-	u_int8_t ver_hdrlen;
-	u_int8_t tos;
-	u_int16_t totallen;
-};
-*/
-char *banstr;
+	unsigned int num = 0;
+	unsigned int key = HASH_FIRSTKEY;
+	int i;
+	int round = HASH_ROUND;
+	int jump = len / HASH_ROUND;
+	if (jump == 0)
+	{
+		jump = 1;
+		round = len;
+	}
+	for (i = 0; i < round; i++)
+	{
+		//printf("-%X\n", key);
+		num = (key << 8) | key;
+		num = (num + line[i * jump]) % TABLE_SIZE;
+		key = num;
+	}
+	return num;
+}
+
 int warning;
 unsigned char * jmp_to_http(unsigned char *p, int maxlen)
 {
@@ -31,6 +52,7 @@ unsigned char * jmp_to_http(unsigned char *p, int maxlen)
 	if(now - p >= maxlen) return NULL;
 	return now;
 }
+/*
 int checklist(unsigned char *p, int max)
 {
 	unsigned char *now = p;
@@ -48,7 +70,8 @@ int checklist(unsigned char *p, int max)
 		if(*(p+i) == 0x0d && *(p+i+1) == 0x0a) break;
 	}
 	return 0;
-}
+}*/
+
 void dump(unsigned char* buf, int size) {
 	int i;
 	printf("\n");
@@ -126,12 +149,17 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 		else
 		{
 			
-			while(point - data < ret)
+			while(point - data + 8 < ret)
 			{
 				point = point + 1;
-				if(*(point-1) == 0x0d && *point == 0x0a)
+				if(*(point-1) == 0x0d && *point == 0x0a && *(point+1) == 'H' && *(point+2) == 'o' && *(point+3) == 's' && *(point+4) == 't')
 				{
-					warning = checklist(point+1, data + ret - point - 1);
+					printf("!\n");
+					char buf[MAX_BUFFSIZE] = {0, };
+					point += 7;
+					strcpy(buf, point);
+					unsigned int num = hash(buf, strlen(buf));
+					if(exist[num] != 0) warning = 1;
 					break;
 				}
 			}
@@ -171,10 +199,33 @@ int main(int argc, char **argv)
 	if(argc != 2)
 	{
 		printf("syntax error\n");
-		printf("syntax : netfilter-test <host>\nsample : netfilter-test test.gilgil.net");
+		printf("syntax : netfilter-test <filename>\nsample : netfilter-test ban.txt");
 		return -1;
 	}
-	banstr = argv[1];
+
+
+	unsigned int num = 0;
+	int len = 0;
+	char* FileName = argv[1];
+	FILE* file = fopen(FileName, "r");
+		if (file == NULL)
+	{
+		printf("FILE Read Error\n");
+		return -1;
+	}
+	char line[MAX_LENGTH];
+	while (fgets(line, MAX_LENGTH, file) != NULL)
+	{
+		len = strlen(line);
+		if (line[len - 1] == '\n') len--;
+		//printf("len : %d\n", len);
+		num = hash(line, len);
+		exist[num] += 1;
+		//printf("[%d]\n", num);
+	}
+	printf("Complete Pre-work!\n");
+
+
 
 	printf("opening library handle\n");
 	h = nfq_open();
